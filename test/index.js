@@ -3,11 +3,12 @@
 
 // Load modules
 
-var Code = require('code');
-var Lab = require('lab');
-var Catbox = require('catbox');
-var Redis = require('..');
-var RedisClient = require('redis');
+const Code = require('code');
+const Lab = require('lab');
+const Catbox = require('catbox');
+const Redis = require('..');
+const RedisClient = require('ioredis');
+const EventEmitter = require('events').EventEmitter;
 
 
 // Declare internals
@@ -16,11 +17,12 @@ var internals = {};
 
 
 // Test shortcuts
-
-var lab = exports.lab = Lab.script();
-var expect = Code.expect;
-var describe = lab.describe;
-var it = lab.test;
+const lab = exports.lab = Lab.script();
+const expect = Code.expect;
+const describe = lab.describe;
+const it = lab.test;
+const before = lab.before;
+const after = lab.after;
 
 
 describe('Redis', function () {
@@ -92,7 +94,9 @@ describe('Redis', function () {
         });
     });
 
-    it('gets an item after settig it', function (done) {
+
+    it('gets an item after setting it', (done) => {
+
 
         var client = new Catbox.Client(Redis);
         client.start(function (err) {
@@ -491,14 +495,12 @@ describe('Redis', function () {
 
             var redis = new Redis(options);
 
-            redis.start(function () {});
 
-            // redis.client.selected_db gets updated after the callback
-            setTimeout(function () {
+            redis.start(() => {
 
-                expect(redis.client.selected_db).to.equal(1);
                 done();
-            }, 10);
+
+            });
         });
 
         it('connects to a unix domain socket when one is provided.', function (done) {
@@ -514,13 +516,86 @@ describe('Redis', function () {
                 expect(err).to.not.exist();
                 var client = redis.client;
                 expect(client).to.exist();
-                expect(client.connected).to.equal(true);
-                expect(client.address).to.equal(options.socket);
                 done();
             });
         });
 
-        it('does not stops the client on error post connection', function (done) {
+
+        it('connects via a Redis URL when one is provided.', (done) => {
+
+            const options = {
+                url: 'redis://127.0.0.1:6379'
+            };
+
+            var redis = new Redis(options);
+
+            redis.start(function (err) {
+
+                expect(err).to.not.exist();
+                const client = redis.client;
+                expect(client).to.exist();
+                done();
+            });
+        });
+
+
+        describe('', () => {
+
+            const oldCreateClient = RedisClient.createClient;
+            before((done) => {
+
+                RedisClient.createClient = function (opts) {
+
+                    const out = new EventEmitter();
+                    process.nextTick(() => {
+
+                        out.emit('ready');
+                        out.removeAllListeners();
+                    });
+                    out.callArgs = opts;
+                    return out;
+                };
+                done();
+            });
+
+            after((done) => {
+
+                RedisClient.createClient = oldCreateClient;
+                done();
+            });
+
+            it('connects to a sentinel cluster.', (done) => {
+
+                const options = {
+                    sentinels: [
+                        {
+                            host: '127.0.0.1',
+                            port: 26379
+                        },
+                        {
+                            host: '127.0.0.2',
+                            port: 26379
+                        }
+                    ],
+                    sentinelName: 'mymaster'
+                };
+
+                const redis = new Redis(options);
+
+                redis.start((err) => {
+
+                    expect(err).to.not.exist();
+                    const client = redis.client;
+                    expect(client).to.exist();
+                    expect(client.callArgs.sentinels).to.equal(options.sentinels);
+                    expect(client.callArgs.name).to.equal(options.sentinelName);
+                    done();
+                });
+            });
+        });
+
+        it('does not stops the client on error post connection', (done) => {
+
 
             var options = {
                 host: '127.0.0.1',
@@ -541,9 +616,11 @@ describe('Redis', function () {
         });
     });
 
-    describe('isReady()', function () {
 
-        it('returns true when when connected', function (done) {
+    describe('isReady()', () => {
+
+        it('returns true when when connected', (done) => {
+
 
             var options = {
                 host: '127.0.0.1',
@@ -563,7 +640,8 @@ describe('Redis', function () {
             });
         });
 
-        it('returns false when stopped', function (done) {
+
+        it('returns false when stopped', (done) => {
 
             var options = {
                 host: '127.0.0.1',
@@ -578,29 +656,6 @@ describe('Redis', function () {
                 expect(redis.isReady()).to.equal(true);
 
                 redis.stop();
-
-                expect(redis.isReady()).to.equal(false);
-
-                done();
-            });
-        });
-
-        it('returns false when disconnected', function (done) {
-
-            var options = {
-                host: '127.0.0.1',
-                port: 6379
-            };
-
-            var redis = new Redis(options);
-
-            redis.start(function (err) {
-
-                expect(err).to.not.exist();
-                expect(redis.client).to.exist();
-                expect(redis.isReady()).to.equal(true);
-
-                redis.client.end();
 
                 expect(redis.isReady()).to.equal(false);
 
@@ -913,7 +968,43 @@ describe('Redis', function () {
         });
     });
 
-    describe('stop()', function () {
+
+    describe('generateKey()', () => {
+
+        it('generates the storage key from a given catbox key', (done) => {
+
+            const options = {
+                partition: 'foo'
+            };
+
+            const redis = new Redis(options);
+
+            const key = {
+                id: 'bar',
+                segment: 'baz'
+            };
+
+            expect(redis.generateKey(key)).to.equal('foo:baz:bar');
+            done();
+        });
+
+        it('generates the storage key from a given catbox key without partition', (done) => {
+
+            const options = {};
+
+            const redis = new Redis(options);
+
+            const key = {
+                id: 'bar',
+                segment: 'baz'
+            };
+
+            expect(redis.generateKey(key)).to.equal('baz:bar');
+            done();
+        });
+    });
+
+    describe('stop()', () => {
 
         it('sets the client to null', function (done) {
 
