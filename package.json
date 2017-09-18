@@ -6,7 +6,7 @@
   "contributors": [
     "Wyatt Preul <wpreul@gmail.com> (http://jsgeek.com)"
   ],
-  "repository": "git://github.com/hapijs/catbox-redis",
+  "repository": "git://github.com/jjfood/JJFSCatboxRedis.git",
   "main": "lib/index.js",
   "keywords": [
     "cache",
