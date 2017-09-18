@@ -17,7 +17,7 @@ Lead Maintainer: [Loic Mahieu](https://github.com/LoicMahieu)
 - `sentinels` - an array of redis sentinel addresses to connect to.
 - `sentinelName` - the name of the sentinel master. (Only needed when `sentinels` is specified)
 - `tls`
-    - `ca` - the public key for connecting via SSL
+    - `ca` - Stringed public key for connecting via SSL
 
 ## Tests
 
